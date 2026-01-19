@@ -102,7 +102,10 @@ export default function SharedBatchPage() {
 
                 {/* Results table - reuse existing component */}
                 <div className="bg-white rounded-lg shadow">
-                    <BatchTable creatives={batchResults.creatives} />
+                    <BatchTable
+                        creatives={batchResults.creatives}
+                        onViewDetail={() => { }}
+                    />
                 </div>
 
                 {/* Footer note */}
