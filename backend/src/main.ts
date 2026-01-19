@@ -13,7 +13,12 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
   app.enableCors({
-    origin: ['https://typend.vercel.app', 'http://localhost:3000'],
+    origin: (origin, callback) => {
+      // Log origin for debugging
+      console.log(`Incoming request from origin: ${origin}`);
+      // In production, we'll be more permissive initially to fix the block
+      callback(null, true);
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     allowedHeaders: 'Content-Type, Accept, Authorization',

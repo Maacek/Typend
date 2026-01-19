@@ -11,6 +11,7 @@ const getBaseUrl = () => {
 };
 
 const API_URL = getBaseUrl();
+export const BASE_URL = API_URL.replace('/api/v1', '');
 
 export interface TextIssue {
     type: 'typo' | 'grammar' | 'readability' | 'capitalization';

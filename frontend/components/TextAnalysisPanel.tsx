@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { TextIssue } from '@/lib/api';
+import { TextIssue, BASE_URL } from '@/lib/api';
 
 interface TextAnalysisPanelProps {
     filename: string;
@@ -98,11 +98,8 @@ export default function TextAnalysisPanel({
         }
     };
 
-    // Get API URL from environment or default
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4010/api/v1';
-    const baseUrl = API_URL.replace('/api/v1', '');
-    const fullImageUrl = `${baseUrl}${imageUrl}`;
-    const fullHeatmapUrl = heatmapUrl ? `${baseUrl}${heatmapUrl}` : null;
+    const fullImageUrl = `${BASE_URL}${imageUrl}`;
+    const fullHeatmapUrl = heatmapUrl ? `${BASE_URL}${heatmapUrl}` : null;
 
     return (
         <div className="border rounded-xl p-6 bg-white shadow-md hover:shadow-lg transition-shadow border-slate-100">

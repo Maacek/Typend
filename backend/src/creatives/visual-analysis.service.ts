@@ -23,10 +23,11 @@ export class VisualAnalysisService implements OnModuleInit {
             const apiKey = this.configService.get<string>('GOOGLE_AI_API_KEY');
 
             if (!apiKey) {
-                this.logger.error('GOOGLE_AI_API_KEY is not defined in .env');
-                this.logger.error('Get your API key from: https://console.cloud.google.com/apis/credentials');
+                this.logger.error('GOOGLE_AI_API_KEY is not defined in environment variables!');
                 return;
             }
+
+            this.logger.log(`Initializing Gemini with key: ${apiKey.substring(0, 5)}...`);
 
             this.genAI = new GoogleGenerativeAI(apiKey);
             this.logger.log('Gemini 1.5 Flash initialized (1,500 RPD free tier)');
@@ -107,7 +108,8 @@ export class VisualAnalysisService implements OnModuleInit {
                 }
             `;
 
-            const model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+            const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash-lite' });
+            this.logger.log(`Sending image to Gemini (${imageBuffer.length} bytes)...`);
             const result = await model.generateContent([
                 scoringPrompt,
                 {
@@ -119,6 +121,7 @@ export class VisualAnalysisService implements OnModuleInit {
             ]);
 
             const response = await result.response;
+            this.logger.log('Gemini analysis received.');
 
             const text = response.text();
             if (!text) {
