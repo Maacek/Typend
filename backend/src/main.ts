@@ -19,7 +19,7 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type, Accept, Authorization',
   });
   const port = process.env.PORT || 4000;
-  await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}/api/v1`);
+  await app.listen(port, '0.0.0.0');
+  console.log(`Application is running on: http://0.0.0.0:${port}/api/v1`);
 }
 bootstrap();
