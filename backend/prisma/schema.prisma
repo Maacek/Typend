@@ -1,0 +1,100 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  batches   Batch[]
+  users     User[]
+}
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  password    String    // Hashed password
+  name        String?
+  role        String    @default("USER")
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Batch {
+  id          String     @id @default(cuid())
+  name        String?
+  status      JobStatus  @default(QUEUED)
+  workspaceId String
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id])
+  creatives   Creative[]
+  
+  // Sharing functionality
+  shareToken  String?    @unique  // Auto-generated secure token
+  shareSlug   String?    @unique  // Optional custom name (e.g., "tender-2024")
+  isPublic    Boolean    @default(false)  // Enable/disable public access
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Creative {
+  id               String          @id @default(cuid())
+  filename         String
+  originalUrl      String
+  mimeType         String
+  size             Int
+  status           JobStatus       @default(QUEUED)
+  batchId          String
+  batch            Batch           @relation(fields: [batchId], references: [id])
+  analysisResult   AnalysisResult?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model AnalysisResult {
+  id              String   @id @default(cuid())
+  creativeId      String   @unique
+  creative        Creative @relation(fields: [creativeId], references: [id])
+  
+  // OCR & Text QA
+  extractedText   String?
+  textIssues      Json?    // Array of { issue, severity, boundingBox }
+  textConfidence  Float?
+  
+  // Dual-API OCR metadata (Phase 2C)
+  ocrProvider     String?  // "dual-consensus", "google", "azure", "tesseract"
+  consensusScore  Float?   // Similarity score between Google and Azure (0-100)
+  googleText      String?  // Raw Google Vision result
+  azureText       String?  // Raw Azure Vision result
+  googleConfidence Float?  // Google Vision confidence
+  azureConfidence  Float?  // Azure Vision confidence
+  
+  // Visual Scoring
+  scores          Json?    // Map of dimension -> score (1-10)
+  overallScore    Float?   // Weighted average of all dimensions
+  explanation     String?  // Senior reviewer narrative
+  suggestions     Json?    // Array of improvements
+  
+  // Heatmap Artefacts
+  heatmapUrl      String?
+  heatmapVersion  String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  DONE
+  FAILED
+  PARTIAL_FAILED
+}

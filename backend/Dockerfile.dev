@@ -1,0 +1,10 @@
+FROM node:20-alpine
+WORKDIR /usr/src/app
+COPY package*.json ./
+# In dev, we might want to install inside the container or rely on volume
+# But for first run, we need dependencies
+RUN npm install
+COPY . .
+RUN npx prisma generate
+EXPOSE 4000
+CMD ["npm", "run", "start:dev"]

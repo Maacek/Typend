@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: va-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-visual_analyzer}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: va-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  minio:
+    image: minio/minio
+    container_name: va-minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    container_name: va-backend
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-visual_analyzer}?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      S3_ENDPOINT: minio
+      S3_PORT: 9000
+      S3_ACCESS_KEY: ${MINIO_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_PASSWORD:-minioadmin}
+    ports:
+      - "4000:4000"
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    volumes:
+      - ../backend:/usr/src/app
+      - /usr/src/app/node_modules
+
+  worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    container_name: va-worker
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-visual_analyzer}?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      S3_ENDPOINT: minio
+      S3_PORT: 9000
+      S3_ACCESS_KEY: ${MINIO_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_PASSWORD:-minioadmin}
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    volumes:
+      - ../backend:/usr/src/app
+      - /usr/src/app/node_modules
+    command: npm run start:worker:dev
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.dev
+    container_name: va-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    depends_on:
+      - backend
+    volumes:
+      - ../frontend:/usr/src/app
+      - /usr/src/app/node_modules
+      - /usr/src/app/.next
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
