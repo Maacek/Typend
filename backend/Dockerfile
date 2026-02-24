@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:18-bullseye-slim
 
 WORKDIR /app
 
@@ -14,6 +14,9 @@ COPY . .
 
 # Generate Prisma client and build TypeScript
 RUN npx prisma generate && npm run build
+
+# Create uploads directory for heatmaps and local storage
+RUN mkdir -p uploads dist/src/uploads dist/uploads
 
 # Verify build output exists in correct location
 RUN ls -la dist/src/ && echo "✅ dist/src/ exists"
