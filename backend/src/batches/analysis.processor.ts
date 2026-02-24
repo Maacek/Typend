@@ -42,23 +42,23 @@ export class AnalysisProcessor extends WorkerHost {
             }
 
             this.logger.log(`Fetching file: ${creative.originalUrl}`);
-
-            // Get file from storage
+            await this.prisma.creative.update({ where: { id: creativeId }, data: { status: 'FETCHING_FILE' as any } });
             const imageBuffer = await this.storage.getFile(creative.originalUrl);
 
             // Phase 2A: OCR Text Extraction
             this.logger.log(`Running OCR extraction...`);
+            await this.prisma.creative.update({ where: { id: creativeId }, data: { status: 'RUNNING_OCR' as any } });
             const ocrResult = await this.ocr.extractText(imageBuffer);
 
             this.logger.log(
                 `OCR completed. Confidence: ${ocrResult.confidence}%, Language: ${ocrResult.language}, Text length: ${ocrResult.text.length}`,
             );
 
-            // Phase 2A.5: AI Text Filtering (Re-enabled with paid tier)
-            // Paid tier allows 1,500 requests/day = 750 creatives/day with filtering
+            // Phase 2A.5: AI Text Filtering
             let filteredText = ocrResult.text;
             if (ocrResult.text && ocrResult.text.trim().length > 0) {
                 this.logger.log(`Filtering banner text from product text...`);
+                await this.prisma.creative.update({ where: { id: creativeId }, data: { status: 'FILTERING_TEXT' as any } });
                 filteredText = await this.ocr.filterBannerText(ocrResult.text, imageBuffer);
                 this.logger.log(
                     `Text filtering completed. Original: ${ocrResult.text.length} chars → Filtered: ${filteredText.length} chars`,
@@ -69,18 +69,16 @@ export class AnalysisProcessor extends WorkerHost {
             let qaResult = null;
             if (filteredText && filteredText.trim().length > 0) {
                 this.logger.log(`Running text QA analysis on filtered text...`);
+                await this.prisma.creative.update({ where: { id: creativeId }, data: { status: 'RUNNING_TEXT_QA' as any } });
                 qaResult = await this.textQa.analyzeText(filteredText, ocrResult.language || 'unknown');
-                this.logger.log(
-                    `Text QA completed. Issues: ${qaResult.issues.length}, Score: ${qaResult.overallScore}`,
-                );
             } else {
                 this.logger.warn(`No banner text found after filtering, skipping Text QA`);
             }
 
-            // Phase 3: Visual Analysis (New)
+            // Phase 3: Visual Analysis
             this.logger.log(`Running visual analysis...`);
+            await this.prisma.creative.update({ where: { id: creativeId }, data: { status: 'RUNNING_VISUAL_ANALYSIS' as any } });
             const visualResult = await this.visualAnalysis.analyzeVisual(imageBuffer, creative.filename);
-            this.logger.log(`Visual analysis completed. Scores: ${JSON.stringify(visualResult.scores)}`);
 
             // Phase 2C: Log consensus information if available
             const consensusScore = (ocrResult as any).consensusScore;
