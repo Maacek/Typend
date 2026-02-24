@@ -82,10 +82,9 @@ export class OcrService {
             return { ...result, consensusScore: 100 };
         }
 
-        // Fall back to Tesseract
-        this.logger.warn('No cloud OCR available - using Tesseract fallback');
-        const result = await this.tesseractProvider.extractText(imageBuffer);
-        return { ...result, consensusScore: 0 }; // Tesseract fallback has no consensus
+        // Fall back to nothing if Tesseract removed to save memory
+        this.logger.warn('No cloud OCR available - unable to extract text due to Tesseract removal (OOM prevention)');
+        return { text: '', confidence: 0, language: 'unknown', provider: 'none', blocks: [], processingTime: 0, consensusScore: 0 };
     }
 
     private async extractWithConsensus(imageBuffer: Buffer): Promise<ConsensusResult> {

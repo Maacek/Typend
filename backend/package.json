@@ -42,22 +42,15 @@
     "@prisma/client": "^6.1.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.66.5",
-    "dictionary-cs": "^4.0.0",
-    "dictionary-en": "^4.0.0",
-    "dictionary-sk": "^2.0.0",
-    "fastest-levenshtein": "^1.0.16",
     "franc": "^5.0.0",
     "ioredis": "^5.9.1",
     "minio": "^8.0.6",
-    "natural": "^8.1.0",
     "node-fetch": "^2.7.0",
-    "nspell": "^2.1.5",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "sharp": "^0.34.5",
-    "tesseract.js": "^7.0.0"
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
