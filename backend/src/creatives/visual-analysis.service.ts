@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { ImageAnnotatorClient } from '@google-cloud/vision';
 import * as sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -9,13 +8,11 @@ import { PrismaService } from '../prisma/prisma.service';
 export class VisualAnalysisService implements OnModuleInit {
     private readonly logger = new Logger(VisualAnalysisService.name);
     private genAI: GoogleGenerativeAI;
-    private visionClient: ImageAnnotatorClient;
 
     constructor(
         private configService: ConfigService,
         private prisma: PrismaService,
     ) {
-        this.visionClient = new ImageAnnotatorClient();
     }
 
     async onModuleInit() {
