@@ -15,12 +15,12 @@ COPY . .
 # Generate Prisma client and build TypeScript
 RUN npx prisma generate && npm run build
 
-# Verify build output exists
-RUN ls -la dist/ && node -e "require('fs').statSync('dist/main.js')" && echo "✅ dist/main.js exists"
+# Verify build output exists in correct location
+RUN ls -la dist/src/ && echo "✅ dist/src/ exists"
 
 ENV NODE_ENV=production
 ENV PORT=4010
 
 EXPOSE 4010
 
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main"]
