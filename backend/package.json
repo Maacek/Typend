@@ -45,6 +45,7 @@
     "franc": "^5.0.0",
     "ioredis": "^5.9.1",
     "minio": "^8.0.6",
+    "multer": "^2.0.2",
     "node-fetch": "^2.7.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",

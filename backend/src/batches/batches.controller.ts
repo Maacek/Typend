@@ -4,13 +4,27 @@ import { AuthGuard } from '@nestjs/passport';
 import type { Response } from 'express';
 import { BatchesService } from './batches.service';
 
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+
 @Controller('batches')
 export class BatchesController {
     constructor(private batchesService: BatchesService) { }
 
     @UseGuards(AuthGuard('jwt'))
     @Post('upload')
-    @UseInterceptors(FilesInterceptor('files', 50))
+    @UseInterceptors(FilesInterceptor('files', 50, {
+        storage: diskStorage({
+            destination: './uploads/',
+            filename: (req, file, cb) => {
+                const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                cb(null, file.fieldname + '-' + uniqueSuffix + extname(file.originalname));
+            }
+        }),
+        limits: {
+            fileSize: 10 * 1024 * 1024, // 10MB per file
+        },
+    }))
     async uploadBatch(
         @UploadedFiles() files: Express.Multer.File[],
         @Request() req: any,

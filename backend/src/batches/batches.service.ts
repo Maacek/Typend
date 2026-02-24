@@ -4,6 +4,8 @@ import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 
+import * as fs from 'fs';
+
 @Injectable()
 export class BatchesService {
     constructor(
@@ -27,7 +29,18 @@ export class BatchesService {
 
         const creativePromises = files.map(async (file) => {
             const filename = `${batch.id}-${Date.now()}-${file.originalname}`;
-            const originalUrl = await this.storage.uploadFile(filename, file.buffer);
+            let fileBuffer: Buffer;
+
+            // Handle both diskStorage and memoryStorage dynamically
+            if (file.path) {
+                fileBuffer = fs.readFileSync(file.path);
+                // Optionally delete local temp file to save disk space
+                // fs.unlinkSync(file.path);
+            } else {
+                fileBuffer = file.buffer;
+            }
+
+            const originalUrl = await this.storage.uploadFile(filename, fileBuffer);
 
             const creative = await this.prisma.creative.create({
                 data: {
