@@ -74,13 +74,31 @@ Změna počítače **bude mít vliv**. Na novém počítači budete muset znovu 
 | Frontend | Vercel (Free) | Auto-deploy z GitHub `main` |
 
 ### Deployment stav (aktualizováno 2026-02-24)
-Problém: Backend crashuje po startu. Příčina: `dist/main` nenalezen.
-Diagnostika: Přidán `postinstall` a `ls -la dist/` do build logu.
-Poslední commit: `6b39967` — debug build output.
+Backend ✅ **FUNGUJE** – login ověřen, dashboard dostupný.
 
-**Co zkontrolovat:** V Railway → Typend → Deployments → Build Logs hledej:
-- `BUILD OK` = nest build proběhl
-- `main.js` ve výpisu `dist/` = soubor existuje
+**Co způsobovalo 502 a jak bylo opraveno:**
+- `tsconfig.json` měl `module: nodenext` → `nest build` generoval soubory do `dist/src/` místo `dist/`
+- `railway.toml` obsahoval `startCommand = "node dist/main"` který přebíjel Dockerfile CMD
+- Řešení: vytvořen `backend/Dockerfile` (node:18-alpine) + odstraněn startCommand z `railway.toml`
+
+### Konfigurace (finální, funkční)
+`backend/Dockerfile` – Railway automaticky detekuje a používá:
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+COPY prisma/ ./prisma/
+RUN npm install
+COPY . .
+RUN npx prisma generate && npm run build
+CMD ["node", "dist/src/main"]
+```
+
+`backend/railway.toml` – pouze komentář, žádné override:
+```toml
+# railway.toml - startCommand is intentionally empty so Dockerfile CMD is used
+```
+
 
 ### Konfigurace `backend/railway.toml`
 ```toml
