@@ -52,7 +52,8 @@ export class BatchesService {
                 },
             });
 
-            await this.analysisQueue.add('analyze', { creativeId: creative.id });
+            // Temporarily disabled queue addition to test if the basic file upload survives without starting processing
+            // await this.analysisQueue.add('analyze', { creativeId: creative.id });
             return creative;
         });
 
