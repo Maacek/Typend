@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npx prisma generate && rm -f dist/tsconfig.tsbuildinfo && npm run build && ls -la dist/src/ | head -5"
+buildCommand = "npm install --include=dev && npx prisma generate && npm run build"
 
 [deploy]
 startCommand = "node dist/src/main"

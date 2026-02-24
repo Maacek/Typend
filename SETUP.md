@@ -49,3 +49,61 @@ Pro spuštění celého stacku musíte mít otevřená dvě okna terminálu:
 
 ### Poznámka k přenosu na jiný počítač
 Změna počítače **bude mít vliv**. Na novém počítači budete muset znovu nainstalovat Node.js a PostgreSQL (kroky v sekci 1 a 2). Samotný kód aplikace si pak stačí jen zkopírovat nebo stáhnout z repozitáře a následovat kroky v sekci 3.
+
+---
+
+## 5. Produkční Deployment (Railway + Vercel)
+
+### URLs
+| Služba | URL | Stav |
+|--------|-----|------|
+| **Frontend** | https://typend.vercel.app | ✅ Funguje |
+| **Backend API** | https://typend-production.up.railway.app/api/v1 | ⚠️ Debugging (viz níže) |
+| **GitHub repo** | https://github.com/Maacek/Typend | ✅ Aktivní |
+
+### Přihlašovací údaje (produkce)
+- **Email:** admin@agentura.cz
+- **Heslo:** admin123
+
+### Infrastruktura
+| Komponenta | Poskytovatel | Detail |
+|------------|-------------|--------|
+| Database | Neon (PostgreSQL 16) | `ep-spring-sun-agj4xvbn-pooler.c-2.eu-central-1.aws.neon.tech` |
+| Backend | Railway (Hobby $5/mo) | Port 4010, us-west2 |
+| Redis | Railway (addon) | `redis.railway.internal:6379` |
+| Frontend | Vercel (Free) | Auto-deploy z GitHub `main` |
+
+### Deployment stav (aktualizováno 2026-02-24)
+Problém: Backend crashuje po startu. Příčina: `dist/main` nenalezen.
+Diagnostika: Přidán `postinstall` a `ls -la dist/` do build logu.
+Poslední commit: `6b39967` — debug build output.
+
+**Co zkontrolovat:** V Railway → Typend → Deployments → Build Logs hledej:
+- `BUILD OK` = nest build proběhl
+- `main.js` ve výpisu `dist/` = soubor existuje
+
+### Konfigurace `backend/railway.toml`
+```toml
+[build]
+builder = "NIXPACKS"
+buildCommand = "npx prisma generate && npm run build && echo 'BUILD OK' && ls -la dist/"
+
+[deploy]
+startCommand = "npm run start:prod"
+```
+
+### Railway ENV Variables (nutné mít nastavené)
+```
+DATABASE_URL=postgresql://...neon.tech/neondb?sslmode=require  (z Neon dashboard)
+JWT_SECRET=<silný náhodný string>
+GOOGLE_AI_API_KEY=<z Google AI Studio>
+GOOGLE_APPLICATION_CREDENTIALS_JSON=<service account JSON jako string>
+AZURE_VISION_KEY=<z Azure portal>
+AZURE_VISION_ENDPOINT=https://visual-analyzer-vision.cognitiveservices.azure.com/
+REDIS_HOST=redis.railway.internal
+REDIS_PORT=6379
+REDIS_PASSWORD=<z Railway Redis service Variables>
+PORT=4010
+```
+
+
