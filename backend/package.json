@@ -15,7 +15,6 @@
     "start:worker:dev": "nest start --watch --entryFile worker/main",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "postinstall": "npx prisma generate && npm run build",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
