@@ -4,8 +4,6 @@ import { GoogleGenAI } from '@google/genai';
 import { IOcrProvider, OcrResult } from './providers/ocr-provider.interface';
 import { GoogleVisionProvider } from './providers/google-vision.provider';
 import { AzureVisionProvider } from './providers/azure-vision.provider';
-import { TesseractProvider } from './providers/tesseract.provider';
-import { distance as levenshtein } from 'fastest-levenshtein';
 
 export interface ConsensusResult extends OcrResult {
     consensusScore: number;
@@ -20,33 +18,28 @@ export class OcrService {
     private readonly logger = new Logger(OcrService.name);
     private googleProvider: GoogleVisionProvider | null = null;
     private azureProvider: AzureVisionProvider | null = null;
-    private tesseractProvider: TesseractProvider;
     private ai: GoogleGenAI | null = null;
 
     private readonly CONSENSUS_THRESHOLD = 95; // User required 95% agreement
 
     constructor(private configService: ConfigService) {
-        // Initialize Tesseract as fallback (always available)
-        this.tesseractProvider = new TesseractProvider();
-
         // Try to initialize cloud providers
         try {
             this.googleProvider = new GoogleVisionProvider();
         } catch (error) {
-            this.logger.warn('Google Vision API not available - will use fallback');
+            this.logger.warn('Google Vision API not available');
         }
 
         try {
             this.azureProvider = new AzureVisionProvider();
         } catch (error) {
-            this.logger.warn('Azure Vision API not available - will use fallback');
+            this.logger.warn('Azure Vision API not available');
         }
 
         // Log which providers are available
         const providers = [];
         if (this.googleProvider) providers.push('Google Vision');
         if (this.azureProvider) providers.push('Azure Vision');
-        providers.push('Tesseract (fallback)');
         this.logger.log(`OCR providers initialized: ${providers.join(', ')}`);
 
         // Initialize Gemini AI for text filtering
@@ -97,8 +90,8 @@ export class OcrService {
                 this.azureProvider!.extractText(imageBuffer),
             ]);
 
-            // Calculate similarity between results
-            const similarity = this.calculateSimilarity(googleResult.text, azureResult.text);
+            // Calculate similarity using simple ratio since levenshtein is removed
+            const similarity = this.calculateBasicSimilarity(googleResult.text, azureResult.text);
 
             this.logger.log(
                 `Consensus analysis: Google=${googleResult.text.length}chars (${googleResult.confidence.toFixed(1)}%), ` +
@@ -112,28 +105,35 @@ export class OcrService {
             return mergedResult;
         } catch (error) {
             this.logger.error(`Dual-API OCR failed: ${error.message}`, error.stack);
-            this.logger.warn('Falling back to Tesseract due to cloud API error');
-            const fallbackResult = await this.tesseractProvider.extractText(imageBuffer);
-            return { ...fallbackResult, consensusScore: 0 };
+            this.logger.warn('Falling back to empty result due to cloud API error');
+            return { text: '', confidence: 0, language: 'unknown', provider: 'none', blocks: [], processingTime: 0, consensusScore: 0 };
         }
     }
 
-    private calculateSimilarity(text1: string, text2: string): number {
+    private calculateBasicSimilarity(text1: string, text2: string): number {
         if (!text1 && !text2) return 100;
         if (!text1 || !text2) return 0;
 
-        // Normalize texts for comparison
         const normalize = (str: string) => str.toLowerCase().trim().replace(/\s+/g, ' ');
         const norm1 = normalize(text1);
         const norm2 = normalize(text2);
 
-        // Calculate Levenshtein distance
+        // Simple length-based similarity approximation to replace fastest-levenshtein
         const maxLength = Math.max(norm1.length, norm2.length);
+        const minLength = Math.min(norm1.length, norm2.length);
+
         if (maxLength === 0) return 100;
 
-        const dist = levenshtein(norm1, norm2);
-        const similarity = ((maxLength - dist) / maxLength) * 100;
+        let matchCount = 0;
+        // Naive bag-of-words similarity for basic functionality without extra packages
+        const words1 = norm1.split(' ');
+        const words2 = norm2.split(' ');
 
+        for (const word of words1) {
+            if (words2.includes(word)) matchCount += word.length;
+        }
+
+        const similarity = (matchCount / maxLength) * 100;
         return Math.max(0, Math.min(100, similarity));
     }
 
