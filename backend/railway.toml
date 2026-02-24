@@ -1,7 +1,5 @@
 [build]
 builder = "NIXPACKS"
-
-[nixpacks]
 buildCommand = "npm install && npx prisma generate && npm run build"
 
 [deploy]
