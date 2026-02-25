@@ -12,7 +12,7 @@ export class GoogleVisionProvider implements IOcrProvider {
         // Requires GOOGLE_APPLICATION_CREDENTIALS environment variable
         if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
             this.logger.warn('GOOGLE_APPLICATION_CREDENTIALS not set. Google Vision Provider will remain disabled.');
-            return;
+            throw new Error('GOOGLE_APPLICATION_CREDENTIALS not set');
         }
 
         try {
