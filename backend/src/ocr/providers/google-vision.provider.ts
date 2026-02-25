@@ -8,10 +8,18 @@ export class GoogleVisionProvider implements IOcrProvider {
     private client: ImageAnnotatorClient;
 
     constructor() {
-        // Initialize Google Vision client
-        // Requires GOOGLE_APPLICATION_CREDENTIALS environment variable
-        if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        // CRITICAL: Do NOT initialize ImageAnnotatorClient if credentials are missing!
+        // The @google-cloud/vision gRPC library fires an INTERNAL unhandled promise
+        // rejection during stub initialization when auth fails. This escapes try-catch
+        // and crashes the entire Node.js process (triggerUncaughtException).
+        // The only safe fix is to never instantiate the client without credentials.
+        const hasCredentials =
+            process.env.GOOGLE_APPLICATION_CREDENTIALS ||
+            process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+
+        if (!hasCredentials) {
             this.logger.warn('GOOGLE_APPLICATION_CREDENTIALS not set. Google Vision Provider will remain disabled.');
+            return; // this.client stays undefined — extractText will throw a safe JS error
         }
 
         try {
