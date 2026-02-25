@@ -19,11 +19,11 @@ RUN npx prisma generate && npm run build
 RUN mkdir -p uploads dist/src/uploads dist/uploads
 
 # Verify build output exists in correct location
-RUN ls -la dist/src/ && echo "✅ dist/src/ exists"
+RUN ls -la dist/ && echo "✅ dist/ exists"
 
 ENV NODE_ENV=production
 ENV PORT=4010
 
 EXPOSE 4010
 
-CMD ["node", "dist/src/main"]
+CMD ["node", "dist/main"]
