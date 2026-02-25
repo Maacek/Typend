@@ -50,7 +50,10 @@ Thumbs.db
 backend/service-account.json
 backend/*.json
 !backend/package.json
+!backend/package-lock.json
 !backend/tsconfig.json
+!backend/tsconfig.build.json
+!backend/nest-cli.json
 
 # Artifacts and temp files
 *.tmp
