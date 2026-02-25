@@ -129,12 +129,14 @@ export class AnalysisProcessor extends WorkerHost {
             });
 
             // Determine final status
-            // We ignore OCR confidence failures for now because OCR providers (Azure, Google) 
-            // might be misconfigured, but we still want the Gemini analysis to succeed.
-            let finalStatus: string = 'DONE';
-
+            let finalStatus: string;
             if (ocrResult.confidence < 50) {
-                this.logger.warn(`Low OCR confidence (${ocrResult.confidence}%) for creative ${creativeId}, but proceeding with DONE status.`);
+                this.logger.warn(
+                    `Low OCR confidence (${ocrResult.confidence}%) for creative ${creativeId}`,
+                );
+                finalStatus = 'PARTIAL_FAILED';
+            } else {
+                finalStatus = 'DONE';
             }
 
             // Update creative status
