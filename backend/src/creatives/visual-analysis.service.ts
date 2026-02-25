@@ -107,7 +107,7 @@ export class VisualAnalysisService implements OnModuleInit {
 
             this.logger.log(`Sending image to Gemini (${imageBuffer.length} bytes)...`);
             const response = await this.genAI.models.generateContent({
-                model: 'gemini-2.0-flash',
+                model: 'gemini-2.5-flash',
                 contents: [
                     {
                         role: 'user',
