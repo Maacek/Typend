@@ -1,4 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { GoogleGenAI } from '@google/genai';
 
 export interface TextIssue {
     type: 'typo' | 'grammar' | 'readability' | 'capitalization';
@@ -18,9 +20,18 @@ export interface TextQaResult {
 @Injectable()
 export class TextQaService implements OnModuleInit {
     private readonly logger = new Logger(TextQaService.name);
+    private ai: GoogleGenAI | null = null;
+
+    constructor(private configService: ConfigService) { }
 
     async onModuleInit() {
-        this.logger.log('Text QA Service initialized (Spellcheck disabled for memory optimization)');
+        const apiKey = this.configService.get<string>('GOOGLE_AI_API_KEY');
+        if (apiKey) {
+            this.ai = new GoogleGenAI({ apiKey });
+            this.logger.log('Text QA Service initialized with AI spell-check');
+        } else {
+            this.logger.log('Text QA Service initialized (Spellcheck disabled for memory optimization)');
+        }
     }
 
     private getLocalizedMessage(key: string, language: string): string {
@@ -49,9 +60,19 @@ export class TextQaService implements OnModuleInit {
             this.logger.log(`Analyzing text in language: ${language}`);
             const issues: TextIssue[] = [];
 
-            // Basic grammar checks
+            // Basic grammar checks (always run)
             const grammarIssues = this.checkBasicGrammar(text, language);
             issues.push(...grammarIssues);
+
+            // AI-powered spell check for Czech diacritics
+            if (this.ai && (language === 'cs' || language === 'cs-CZ' || language === 'unknown')) {
+                try {
+                    const diacriticsIssues = await this.checkCzechDiacritics(text);
+                    issues.push(...diacriticsIssues);
+                } catch (e) {
+                    this.logger.warn(`AI spell check failed, skipping: ${e.message}`);
+                }
+            }
 
             // Readability analysis
             const readabilityScore = this.calculateReadability(text);
@@ -59,7 +80,7 @@ export class TextQaService implements OnModuleInit {
             // Calculate overall score
             const overallScore = this.calculateOverallScore(issues, readabilityScore);
 
-            this.logger.log(`Text QA completed. Score: ${overallScore}`);
+            this.logger.log(`Text QA completed. Score: ${overallScore}, Issues: ${issues.length}`);
 
             return {
                 issues,
@@ -71,6 +92,65 @@ export class TextQaService implements OnModuleInit {
             this.logger.error(`Text QA analysis failed: ${error.message}`, error.stack);
             throw error;
         }
+    }
+
+    /**
+     * Use Gemini to detect Czech words with missing diacritics (háčky, čárky).
+     * This catches OCR mistakes where ř→r, š→s, č→c, ž→z, á→a, é→e, í→i, ó→o, ú→u, ů→u etc.
+     */
+    private async checkCzechDiacritics(text: string): Promise<TextIssue[]> {
+        if (!this.ai || !text.trim()) return [];
+
+        const prompt = `Jsi specializovaný kontrolor českého textu.
+
+TEXT K ANALÝZE:
+"${text}"
+
+ÚKOL: Zkontroluj, zda text neobsahuje slova s chybějícími háčky nebo čárkami.
+Jde typicky o chybu OCR, kdy například:
+- "PRATEL" místo "PŘÁTELÉ"
+- "PRÁTELI" místo "PŘÁTELI"
+- "DESKOVKY" je správně (žádné háčky)
+- "NEJRADSI" místo "NEJRADŠÍ"
+
+Důležité: Hledej POUZE chybějící diakritiku (háčky/čárky), ne jiné gramatické chyby.
+Ignoruj slova, která háčky ani čárky nepotřebují.
+Ignoruj zkratky, vlastní jména, cizí slova.
+
+Vypiš POUZE slova, která mají chybějící diakritiku ve formátu JSON:
+[
+  { "wrong": "PRÁTELI", "correct": "PŘÁTELI" }
+]
+
+Pokud žádné chyby nenajdeš, vrať prázdné pole: []
+BEZ komentářů, POUZE JSON pole.`;
+
+        const response = await this.ai.models.generateContent({
+            model: 'gemini-2.0-flash-lite',
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        });
+
+        const raw = (response.text || '').trim();
+        // Strip markdown code fences if present
+        const jsonStr = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
+        let parsed: { wrong: string; correct: string }[];
+        try {
+            parsed = JSON.parse(jsonStr);
+        } catch {
+            this.logger.warn(`AI diacritics check returned non-JSON: ${raw.substring(0, 100)}`);
+            return [];
+        }
+
+        if (!Array.isArray(parsed) || parsed.length === 0) return [];
+
+        this.logger.log(`AI found ${parsed.length} Czech diacritics issue(s)`);
+        return parsed.map(item => ({
+            type: 'typo' as const,
+            severity: 'high' as const,
+            text: `Slovo "${item.wrong}" pravděpodobně chybí háčky nebo čárky`,
+            suggestion: `Správně: "${item.correct}"`,
+        }));
     }
 
     private checkBasicGrammar(text: string, language: string): TextIssue[] {
