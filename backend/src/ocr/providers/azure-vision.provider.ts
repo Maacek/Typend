@@ -111,8 +111,15 @@ export class AzureVisionProvider implements IOcrProvider {
                 processingTime,
             };
         } catch (error) {
-            this.logger.error(`Azure Vision OCR failed: ${error.message}`, error.stack);
-            throw error;
+            this.logger.error(`Azure Vision OCR failed: ${error.message}. Returning empty result.`);
+            return {
+                text: '',
+                confidence: 0,
+                language: 'unknown',
+                provider: 'azure-vision',
+                blocks: [],
+                processingTime: Date.now() - startTime,
+            };
         }
     }
 }
