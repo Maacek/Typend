@@ -1,13 +1,13 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import * as sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class VisualAnalysisService implements OnModuleInit {
     private readonly logger = new Logger(VisualAnalysisService.name);
-    private genAI: GoogleGenerativeAI;
+    private genAI: GoogleGenAI;
 
     constructor(
         private configService: ConfigService,
@@ -26,7 +26,7 @@ export class VisualAnalysisService implements OnModuleInit {
 
             this.logger.log(`Initializing Gemini with key: ${apiKey.substring(0, 5)}...`);
 
-            this.genAI = new GoogleGenerativeAI(apiKey);
+            this.genAI = new GoogleGenAI({ apiKey });
             this.logger.log('Gemini 1.5 Flash initialized (1,500 RPD free tier)');
         } catch (error) {
             this.logger.error(`Failed to initialize Gemini: ${error.message}`);
@@ -105,22 +105,28 @@ export class VisualAnalysisService implements OnModuleInit {
                 }
             `;
 
-            const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             this.logger.log(`Sending image to Gemini (${imageBuffer.length} bytes)...`);
-            const result = await model.generateContent([
-                scoringPrompt,
-                {
-                    inlineData: {
-                        data: imageBuffer.toString('base64'),
-                        mimeType: 'image/png',
-                    },
-                },
-            ]);
+            const response = await this.genAI.models.generateContent({
+                model: 'gemini-2.0-flash',
+                contents: [
+                    {
+                        role: 'user',
+                        parts: [
+                            { text: scoringPrompt },
+                            {
+                                inlineData: {
+                                    data: imageBuffer.toString('base64'),
+                                    mimeType: 'image/jpeg',
+                                }
+                            }
+                        ]
+                    }
+                ]
+            });
 
-            const response = await result.response;
             this.logger.log('Gemini analysis received.');
 
-            const text = response.text();
+            const text = response.text;
             if (!text) {
                 throw new Error('Empty response from Gemini API');
             }
