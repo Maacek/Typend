@@ -101,34 +101,41 @@ export class TextQaService implements OnModuleInit {
     private async checkCzechDiacritics(text: string): Promise<TextIssue[]> {
         if (!this.ai || !text.trim()) return [];
 
-        const prompt = `Jsi specializovaný kontrolor českého textu.
+        const prompt = [
+            'Jsi specializovaný kontrolor českého pravopisu. Tvůj výstup musí být vždy konzistentní.',
+            '',
+            'TEXT K ANALÝZE:',
+            `"${text}"`,
+            '',
+            'ÚKOL: Najdi slova s CHYBĚJÍCÍMI háčky nebo čárkami — typické chyby OCR čtečky textu z obrazu.',
+            '',
+            'Nejčastější OCR chyby v češtině (TYTO VŽDY HLÁSIT):',
+            '- "PRÁTELI" → CHYBA, správně "PŘÁTELI" (chybí Ř na začátku)',
+            '- "PRATELI" → CHYBA, správně "PŘÁTELI"',
+            '- "PRATELE" → CHYBA, správně "PŘÁTELÉ"',
+            '- "NEJRADSI" → CHYBA, správně "NEJRADŠÍ"',
+            '- "HRAJETE", "DESKOVKY", "RODINOU" → správně (háčky nepotřebují)',
+            '',
+            'KLÍČOVÉ PRAVIDLO pro ŘE/ŘÁ:',
+            '  Slovo "přáteli" / "přátelé" VŽDY obsahuje Ř. "PRÁTELI" bez Ř je vždy chyba OCR.',
+            '',
+            'Ignoruj zkratky, vlastní jména a cizí slova.',
+            'Hledej POUZE chybějící háčky/čárky, ne jiné gramatické chyby.',
+            '',
+            'Výstup — POUZE JSON pole, žádný komentář:',
+            '[',
+            '  { "wrong": "PRÁTELI", "correct": "PŘÁTELI" }',
+            ']',
+            'Pokud žádné chyby nejsou → vrať: []',
+        ].join('\n');
 
-TEXT K ANALÝZE:
-"${text}"
-
-ÚKOL: Zkontroluj, zda text neobsahuje slova s chybějícími háčky nebo čárkami.
-Jde typicky o chybu OCR, kdy například:
-- "PRATEL" místo "PŘÁTELÉ"
-- "PRÁTELI" místo "PŘÁTELI"
-- "DESKOVKY" je správně (žádné háčky)
-- "NEJRADSI" místo "NEJRADŠÍ"
-
-Důležité: Hledej POUZE chybějící diakritiku (háčky/čárky), ne jiné gramatické chyby.
-Ignoruj slova, která háčky ani čárky nepotřebují.
-Ignoruj zkratky, vlastní jména, cizí slova.
-
-Vypiš POUZE slova, která mají chybějící diakritiku ve formátu JSON:
-[
-  { "wrong": "PRÁTELI", "correct": "PŘÁTELI" }
-]
-
-Pokud žádné chyby nenajdeš, vrať prázdné pole: []
-BEZ komentářů, POUZE JSON pole.`;
 
         const response = await this.ai.models.generateContent({
             model: 'gemini-2.0-flash-lite',
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            config: { temperature: 0 }, // Deterministic — same input MUST give same output
         });
+
 
         const raw = (response.text || '').trim();
         // Strip markdown code fences if present
