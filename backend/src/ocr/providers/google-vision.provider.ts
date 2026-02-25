@@ -12,19 +12,26 @@ export class GoogleVisionProvider implements IOcrProvider {
         // The @google-cloud/vision gRPC library fires an INTERNAL unhandled promise
         // rejection during stub initialization when auth fails. This escapes try-catch
         // and crashes the entire Node.js process (triggerUncaughtException).
-        // The only safe fix is to never instantiate the client without credentials.
-        const hasCredentials =
-            process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-            process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+        const credentialsFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+        const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
 
-        if (!hasCredentials) {
+        if (!credentialsFile && !credentialsJson) {
             this.logger.warn('GOOGLE_APPLICATION_CREDENTIALS not set. Google Vision Provider will remain disabled.');
             return; // this.client stays undefined — extractText will throw a safe JS error
         }
 
         try {
-            this.client = new ImageAnnotatorClient();
-            this.logger.log('Google Vision API client initialized');
+            if (credentialsJson && !credentialsFile) {
+                // Railway/Docker: credentials supplied as inline JSON string env var
+                // ImageAnnotatorClient cannot read JSON strings natively — must parse and pass directly
+                const credentials = JSON.parse(credentialsJson);
+                this.client = new ImageAnnotatorClient({ credentials });
+                this.logger.log('Google Vision API client initialized (via GOOGLE_APPLICATION_CREDENTIALS_JSON)');
+            } else {
+                // Standard: credentials file path set via GOOGLE_APPLICATION_CREDENTIALS
+                this.client = new ImageAnnotatorClient();
+                this.logger.log('Google Vision API client initialized (via credentials file)');
+            }
         } catch (error) {
             this.logger.error(`Failed to initialize Google Vision API: ${error.message}`);
         }
