@@ -84,9 +84,11 @@ export default function Home() {
 
     const filtered = batchResults.creatives.filter(creative => {
       const result = creative.analysisResult;
+
+      // If creative is still processing or failed, it might not have results. 
+      // Only hide it if the user explicitly filters for a different status.
       if (!result) {
-        console.log('No result for:', creative.filename);
-        return false;
+        return filters.status === 'all' || creative.status === filters.status;
       }
 
       // Calculate overall score if missing (for legacy data)
