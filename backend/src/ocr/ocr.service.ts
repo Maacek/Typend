@@ -84,45 +84,47 @@ export class OcrService {
         this.logger.log('Running dual-API OCR with consensus validation...');
 
         try {
-            // Execute both APIs in parallel
-            const [googleResult, azureResult] = await Promise.all([
+            // Execute both APIs in parallel using allSettled so one failure doesn't bypass the other
+            const [googleSettled, azureSettled] = await Promise.allSettled([
                 this.googleProvider!.extractText(imageBuffer),
                 this.azureProvider!.extractText(imageBuffer),
             ]);
 
-            // Calculate similarity using simple ratio since levenshtein is removed
-            const similarity = this.calculateBasicSimilarity(googleResult.text, azureResult.text);
+            const googleResult = googleSettled.status === 'fulfilled' ? googleSettled.value : null;
+            const azureResult = azureSettled.status === 'fulfilled' ? azureSettled.value : null;
 
-            this.logger.log(
-                `Consensus analysis: Google=${googleResult.text.length}chars (${googleResult.confidence.toFixed(1)}%), ` +
-                `Azure=${azureResult.text.length}chars (${azureResult.confidence.toFixed(1)}%), ` +
-                `Similarity=${similarity.toFixed(1)}%`,
-            );
+            if (googleSettled.status === 'rejected') {
+                this.logger.error(`Google Vision failing locally or API issue: ${googleSettled.reason?.message}`);
+            }
+            if (azureSettled.status === 'rejected') {
+                this.logger.error(`Azure Vision failing locally or API issue: ${azureSettled.reason?.message}`);
+            }
 
-            // Decide based on consensus threshold
-            const mergedResult = this.mergeResults(googleResult, azureResult, similarity);
+            if (!googleResult && !azureResult) {
+                throw new Error('Both Google Vision and Azure Vision failed concurrently');
+            }
 
-            return mergedResult;
+            if (googleResult && azureResult) {
+                // Calculate similarity using simple ratio since levenshtein is removed
+                const similarity = this.calculateBasicSimilarity(googleResult.text, azureResult.text);
+
+                this.logger.log(
+                    `Consensus analysis: Google=${googleResult.text.length}chars (${googleResult.confidence.toFixed(1)}%), ` +
+                    `Azure=${azureResult.text.length}chars (${azureResult.confidence.toFixed(1)}%), ` +
+                    `Similarity=${similarity.toFixed(1)}%`,
+                );
+
+                // Decide based on consensus threshold
+                return this.mergeResults(googleResult, azureResult, similarity);
+            } else if (azureResult) {
+                this.logger.warn('Fallback: Using standalone Azure Vision because Google Vision failed.');
+                return { ...azureResult, consensusScore: 100 };
+            } else {
+                this.logger.warn('Fallback: Using standalone Google Vision because Azure Vision failed.');
+                return { ...googleResult!, consensusScore: 100 };
+            }
         } catch (error) {
-            this.logger.error(`Dual-API OCR failed or one provider crashed: ${error.message}`);
-
-            // If dual-api fails mid-flight, attempt graceful fallback to standalone providers
-            try {
-                this.logger.warn('Attempting fallback to standalone Azure Vision...');
-                const azureFall = await this.azureProvider!.extractText(imageBuffer);
-                if (azureFall.text) return { ...azureFall, consensusScore: 100 };
-            } catch (azureErr) {
-                this.logger.error(`Fallback Azure failed: ${azureErr.message}`);
-            }
-
-            try {
-                this.logger.warn('Attempting fallback to standalone Google Vision...');
-                const googleFall = await this.googleProvider!.extractText(imageBuffer);
-                if (googleFall.text) return { ...googleFall, consensusScore: 100 };
-            } catch (googleErr) {
-                this.logger.error(`Fallback Google failed: ${googleErr.message}`);
-            }
-
+            this.logger.error(`Dual-API OCR catastrophic failure: ${error.message}`);
             this.logger.warn('All OCR fallbacks failed, returning empty result');
             return { text: '', confidence: 0, language: 'unknown', provider: 'none', blocks: [], processingTime: 0, consensusScore: 0 };
         }

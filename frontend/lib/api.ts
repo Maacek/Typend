@@ -59,9 +59,16 @@ const api = axios.create({
 
 // Add interceptor for JWT
 api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+    if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('token');
+        if (token) {
+            // Use set() for modern Axios versions (AxiosHeaders object)
+            if (config.headers && typeof config.headers.set === 'function') {
+                config.headers.set('Authorization', `Bearer ${token}`);
+            } else if (config.headers) {
+                config.headers['Authorization'] = `Bearer ${token}`;
+            }
+        }
     }
     return config;
 });

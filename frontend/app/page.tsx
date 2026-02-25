@@ -322,20 +322,28 @@ export default function Home() {
               <BatchTable
                 creatives={filteredCreatives}
                 onViewDetail={(id) => {
-                  // Switch to Grid view
+                  // Switch to Grid view first
                   setViewMode('grid');
-                  // Scroll to the creative after a short delay to allow view switch
-                  setTimeout(() => {
+
+                  // Wait for React to render the grid elements before scrolling
+                  const scrollToElement = (attempts = 0) => {
                     const element = document.getElementById(`creative-${id}`);
                     if (element) {
+                      // Found the element, scroll to it
                       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      // Highlight briefly
-                      element.classList.add('ring-4', 'ring-indigo-500');
+                      // Add highlight effect
+                      element.classList.add('ring-4', 'ring-indigo-500', 'rounded-xl');
                       setTimeout(() => {
-                        element.classList.remove('ring-4', 'ring-indigo-500');
+                        element.classList.remove('ring-4', 'ring-indigo-500', 'rounded-xl');
                       }, 2000);
+                    } else if (attempts < 10) {
+                      // Element not in DOM yet, try again shortly (max 10 attempts ~ 500ms)
+                      setTimeout(() => scrollToElement(attempts + 1), 50);
                     }
-                  }, 100);
+                  };
+
+                  // Start searching for the element immediately after state is set
+                  setTimeout(() => scrollToElement(0), 10);
                 }}
               />
             )}

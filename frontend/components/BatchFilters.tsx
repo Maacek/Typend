@@ -99,7 +99,7 @@ export default function BatchFilters({ filters, onFiltersChange, onReset }: Batc
                     <h3 className="text-lg font-bold text-slate-800">🔍 Filtry</h3>
                     {activeFiltersCount > 0 && (
                         <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold">
-                            {activeFiltersCount} aktivních
+                            Aktivní
                         </span>
                     )}
                     {hasChanges && (

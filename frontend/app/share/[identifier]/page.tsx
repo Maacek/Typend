@@ -104,7 +104,9 @@ export default function SharedBatchPage() {
                 <div className="bg-white rounded-lg shadow">
                     <BatchTable
                         creatives={batchResults.creatives}
-                        onViewDetail={() => { }}
+                        onViewDetail={(id) => {
+                            alert('V sdíleném náhledu zatím detailní náhled není k dispozici. Pracujeme na tom.');
+                        }}
                     />
                 </div>
 

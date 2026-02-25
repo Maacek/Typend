@@ -43,12 +43,27 @@ Local / Dev:
 
 | Service | Port | Notes |
 |------|------|------|
-| Frontend | 3000 | UI |
-| Backend API | 4010 | REST API |
+| Frontend | 3000 | UI (Runs on `http://localhost:3000`) |
+| Backend API | 4010 | REST API Orchestrator (Runs on `http://localhost:4010`) |
+| Backend Worker | N/A | Background process (`npm run start:worker:dev`) |
 | Redis | 6379 | Queue (BullMQ) |
-| Worker | – | npm run start:worker:dev |
 | PostgreSQL | 5432 | DB (Local) |
-| Storage | – | Local folder |
+| Storage | – | Local folder `backend/uploads` |
+
+### External APIs & Secrets Mapping
+
+Aby se předešlo zmatkům v deploymentu, zde je tabulka všech API a jejich klíčů:
+
+| Feature / Fáze | Služba | Konfigurační klíč | Kde je definován | Role |
+|---------------|--------|------------------|-----------------|------|
+| **OCR Backend** | Azure Vision API | `AZURE_VISION_KEY` / `AZURE_VISION_ENDPOINT` | `backend/.env` | Extrahuje text z kreativ (Phase 2A) |
+| **OCR Backend** | Google Cloud Vision | `GOOGLE_APPLICATION_CREDENTIALS` | `backend/.env` | Alternativní OCR pro porovnání (Phase 2A) |
+| **Příprava Textu** | Google Gemini | `GOOGLE_AI_API_KEY` | `backend/.env` | Model `gemini-1.5-flash`: Filtruje banner text od produktu |
+| **Vizuální Analýza**| Google Gemini | `GOOGLE_AI_API_KEY` | `backend/.env` | Model `gemini-2.5-flash`: Dává skóre a doporučení (Phase 3) |
+| **Frontend API** | Lokální Backend | `NEXT_PUBLIC_API_URL` | `frontend/.env.local` | Zásadní: Musí vždy ukazovat na běžící API (lokálně `4010`) |
+
+> **Důležité pravidlo Deploymentu:**  
+> Pokud vyprší `GOOGLE_AI_API_KEY`, backend worker selže u vizuální analýzy a filtrace textu. Lokální běh používá `backend/.env`, zatímco produkce (Railway) používá proměnné nastavené v administraci Railway. Generování nového lokálního klíče nijak neovlivňuje produkční klíče, ale je nutné ho vždy uvést ve správném `.env` souboru.
 
 ### Communication Flow
 

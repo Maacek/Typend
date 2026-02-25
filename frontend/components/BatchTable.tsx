@@ -41,10 +41,12 @@ export default function BatchTable({ creatives, onViewDetail }: BatchTableProps)
             cell: info => (
                 <div className="flex flex-col gap-2 py-2">
                     <img
-                        src={`http://localhost:4010${info.row.original.originalUrl}`}
+                        src={info.row.original.originalUrl.startsWith('http') ? info.row.original.originalUrl : `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4010/api/v1').replace('/api/v1', '')}${info.row.original.originalUrl}`}
                         alt={info.getValue()}
                         className="w-20 h-20 object-cover rounded border border-slate-200"
-                        onError={(e) => e.currentTarget.style.display = 'none'}
+                        onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                        }}
                     />
                     <span className="font-medium text-slate-800 text-xs max-w-[200px] break-words">{info.getValue()}</span>
                 </div>
