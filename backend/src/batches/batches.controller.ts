@@ -81,6 +81,19 @@ export class BatchesController {
         return this.batchesService.revokeShareToken(batchId, req.user.workspaceId);
     }
 
+    @Get('debug/models')
+    async debugModels() {
+        const apiKey = process.env.GOOGLE_AI_API_KEY;
+        if (!apiKey) return { error: 'No API key configured' };
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+            const data = await res.json();
+            return data;
+        } catch (e) {
+            return { error: e.message };
+        }
+    }
+
     // Public access (no auth required)
     @Get('share/:identifier')
     async getSharedBatch(@Param('identifier') identifier: string) {
