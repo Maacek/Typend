@@ -11,6 +11,14 @@ import { CreativesModule } from '../creatives/creatives.module';
   imports: [
     BullModule.registerQueue({
       name: 'analysis',
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+        removeOnComplete: true, // Keep the queue clean
+      },
     }),
     OcrModule,
     TextQaModule,
