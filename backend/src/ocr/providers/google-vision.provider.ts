@@ -10,12 +10,16 @@ export class GoogleVisionProvider implements IOcrProvider {
     constructor() {
         // Initialize Google Vision client
         // Requires GOOGLE_APPLICATION_CREDENTIALS environment variable
+        if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            this.logger.warn('GOOGLE_APPLICATION_CREDENTIALS not set. Google Vision Provider will remain disabled.');
+            return;
+        }
+
         try {
             this.client = new ImageAnnotatorClient();
             this.logger.log('Google Vision API client initialized');
         } catch (error) {
             this.logger.error(`Failed to initialize Google Vision API: ${error.message}`);
-            throw error;
         }
     }
 
@@ -28,6 +32,10 @@ export class GoogleVisionProvider implements IOcrProvider {
 
         try {
             this.logger.log('Starting Google Vision OCR...');
+
+            if (!this.client) {
+                throw new Error('Google Vision client is disabled because credentials were not provided.');
+            }
 
             // Call Google Vision API for text detection
             const [result] = await this.client.textDetection(imageBuffer);
