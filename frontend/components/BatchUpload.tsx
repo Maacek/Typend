@@ -32,11 +32,7 @@ export default function BatchUpload({ onBatchCreated }: BatchUploadProps) {
         files.forEach((file) => formData.append('files', file));
 
         try {
-            const response = await api.post('/batches/upload', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
+            const response = await api.post('/batches/upload', formData);
 
             // Call parent callback with batchId
             if (onBatchCreated && response.data.batchId) {

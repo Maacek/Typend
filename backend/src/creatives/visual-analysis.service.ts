@@ -105,7 +105,7 @@ export class VisualAnalysisService implements OnModuleInit {
                 }
             `;
 
-            const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+            const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
             this.logger.log(`Sending image to Gemini (${imageBuffer.length} bytes)...`);
             const result = await model.generateContent([
                 scoringPrompt,

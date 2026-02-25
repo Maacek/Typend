@@ -71,9 +71,7 @@ export async function uploadBatch(files: File[], name?: string) {
     files.forEach((file) => formData.append('files', file));
     if (name) formData.append('name', name);
 
-    const response = await api.post('/batches/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await api.post('/batches/upload', formData);
     return response.data;
 }
 
