@@ -104,8 +104,26 @@ export class OcrService {
 
             return mergedResult;
         } catch (error) {
-            this.logger.error(`Dual-API OCR failed: ${error.message}`, error.stack);
-            this.logger.warn('Falling back to empty result due to cloud API error');
+            this.logger.error(`Dual-API OCR failed or one provider crashed: ${error.message}`);
+
+            // If dual-api fails mid-flight, attempt graceful fallback to standalone providers
+            try {
+                this.logger.warn('Attempting fallback to standalone Azure Vision...');
+                const azureFall = await this.azureProvider!.extractText(imageBuffer);
+                if (azureFall.text) return { ...azureFall, consensusScore: 100 };
+            } catch (azureErr) {
+                this.logger.error(`Fallback Azure failed: ${azureErr.message}`);
+            }
+
+            try {
+                this.logger.warn('Attempting fallback to standalone Google Vision...');
+                const googleFall = await this.googleProvider!.extractText(imageBuffer);
+                if (googleFall.text) return { ...googleFall, consensusScore: 100 };
+            } catch (googleErr) {
+                this.logger.error(`Fallback Google failed: ${googleErr.message}`);
+            }
+
+            this.logger.warn('All OCR fallbacks failed, returning empty result');
             return { text: '', confidence: 0, language: 'unknown', provider: 'none', blocks: [], processingTime: 0, consensusScore: 0 };
         }
     }
