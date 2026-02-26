@@ -131,7 +131,7 @@ export class TextQaService implements OnModuleInit {
 
 
         const response = await this.ai.models.generateContent({
-            model: 'gemini-2.0-flash-lite',
+            model: 'gemini-2.5-flash-lite',
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             config: { temperature: 0 }, // Deterministic — same input MUST give same output
         });
