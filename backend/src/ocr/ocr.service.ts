@@ -174,49 +174,33 @@ export class OcrService {
         azureResult: OcrResult,
         similarity: number,
     ): ConsensusResult {
-        // High consensus (≥95%): providers agree on content — prefer Azure text (better diacritics)
-        if (similarity >= this.CONSENSUS_THRESHOLD) {
-            const avgConfidence = (googleResult.confidence + azureResult.confidence) / 2 + 10; // Bonus for consensus
-            // Prefer Azure text: Azure Vision reliably preserves Czech diacritics (háčky/čárky).
-            // Google Vision often drops ř→r, š→s etc., so at consensus we use Azure's version.
-            const preferredText = azureResult.text.length > 0 ? azureResult.text : googleResult.text;
+        // Confidence = weighted average of both providers' per-word confidence.
+        // This is the TRUE OCR accuracy (how confident each engine is about the characters it detected).
+        // The consensus similarity is logged as metadata but does NOT penalize reported confidence —
+        // banner texts legitimately have minor differences between providers (word order, punctuation, fragments).
+        const avgConfidence = (googleResult.confidence + azureResult.confidence) / 2;
+        // Small bonus if providers highly agree (validates accuracy)
+        const consensusBonus = similarity >= 90 ? 5 : similarity >= 75 ? 2 : 0;
+        const finalConfidence = Math.min(100, avgConfidence + consensusBonus);
 
-            return {
-                text: preferredText,
-                confidence: Math.min(100, avgConfidence),
-                language: azureResult.language || googleResult.language,
-                provider: 'dual-consensus',
-                blocks: [...(googleResult.blocks || []), ...(azureResult.blocks || [])],
-                processingTime: Math.max(googleResult.processingTime, azureResult.processingTime),
-                consensusScore: similarity,
-                googleText: googleResult.text,
-                azureText: azureResult.text,
-                googleConfidence: googleResult.confidence,
-                azureConfidence: azureResult.confidence,
-            };
+        // Always prefer Azure text — Azure Vision reliably preserves Czech diacritics (háčky/čárky).
+        const preferredText = azureResult.text.length > 0 ? azureResult.text : googleResult.text;
+
+        if (similarity < 75) {
+            this.logger.warn(`Low consensus (${similarity.toFixed(1)}%) — texts differ significantly, using Azure text`);
+        } else if (similarity < 90) {
+            this.logger.log(`Medium consensus (${similarity.toFixed(1)}%) — minor differences, using Azure text`);
+        } else {
+            this.logger.log(`High consensus (${similarity.toFixed(1)}%) — providers agree`);
         }
-
-        // Medium consensus (85-94%): use longer result
-        if (similarity >= 85) {
-            const longerResult = googleResult.text.length >= azureResult.text.length ? googleResult : azureResult;
-            this.logger.warn(`Medium consensus (${similarity.toFixed(1)}%) - using longer result from ${longerResult.provider}`);
-
-            return {
-                ...longerResult,
-                consensusScore: similarity,
-                googleText: googleResult.text,
-                azureText: azureResult.text,
-                googleConfidence: googleResult.confidence,
-                azureConfidence: azureResult.confidence,
-            };
-        }
-
-        // Low consensus (<85%): use Google by default with penalty
-        this.logger.warn(`Low consensus (${similarity.toFixed(1)}%) - using Google result with confidence penalty`);
 
         return {
-            ...googleResult,
-            confidence: Math.max(0, googleResult.confidence - 20), // Penalty for low consensus
+            text: preferredText,
+            confidence: finalConfidence,
+            language: azureResult.language || googleResult.language,
+            provider: 'dual-consensus',
+            blocks: [...(googleResult.blocks || []), ...(azureResult.blocks || [])],
+            processingTime: Math.max(googleResult.processingTime, azureResult.processingTime),
             consensusScore: similarity,
             googleText: googleResult.text,
             azureText: azureResult.text,
