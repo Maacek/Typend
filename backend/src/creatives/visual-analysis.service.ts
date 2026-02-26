@@ -121,7 +121,8 @@ export class VisualAnalysisService implements OnModuleInit {
                             }
                         ]
                     }
-                ]
+                ],
+                config: { temperature: 0 }, // Deterministic — same image = same scores
             });
 
             this.logger.log('Gemini analysis received.');
