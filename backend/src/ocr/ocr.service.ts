@@ -143,26 +143,29 @@ export class OcrService {
         if (!text1 || !text2) return 0;
 
         // Normalize AND strip diacritics before comparing.
-        // This ensures 'PŘÁTELI' (Azure) and 'PRÁTELI' (Google) count as the same word —
-        // the providers agree on the WORD, just differ on diacritics (which is an OCR limitation).
+        // This ensures 'PŘÁTELI' (Azure) and 'PRÁTELI' (Google) count as the same word.
         const normalize = (str: string) =>
             this.removeDiacritics(str.toLowerCase().trim().replace(/\s+/g, ' '));
 
         const norm1 = normalize(text1);
         const norm2 = normalize(text2);
 
-        const maxLength = Math.max(norm1.length, norm2.length);
-        if (maxLength === 0) return 100;
+        if (norm1 === norm2) return 100;
 
-        let matchCount = 0;
-        const words1 = norm1.split(' ');
-        const words2 = norm2.split(' ');
+        // Jaccard word-set similarity: |intersection| / |union| * 100
+        // This correctly handles different word orderings, extra spaces, and partial matches.
+        const words1 = new Set(norm1.split(' ').filter(w => w.length > 0));
+        const words2 = new Set(norm2.split(' ').filter(w => w.length > 0));
 
+        let intersection = 0;
         for (const word of words1) {
-            if (words2.includes(word)) matchCount += word.length;
+            if (words2.has(word)) intersection++;
         }
 
-        const similarity = (matchCount / maxLength) * 100;
+        const union = words1.size + words2.size - intersection;
+        if (union === 0) return 100;
+
+        const similarity = (intersection / union) * 100;
         return Math.max(0, Math.min(100, similarity));
     }
 
