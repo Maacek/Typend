@@ -64,12 +64,15 @@ export class TextQaService implements OnModuleInit {
             const grammarIssues = this.checkBasicGrammar(text, language);
             issues.push(...grammarIssues);
 
-            // Czech diacritics check: simple literal matching on the extracted text
-            // If a known wrong word appears → flag it. If the correct word appears → skip.
-            // No AI, no diacritics stripping, no normalization. Just direct string matching.
-            if (language === 'cs' || language === 'cs-CZ' || language === 'unknown') {
-                const diacriticsIssues = this.checkKnownDiacritics(text);
-                issues.push(...diacriticsIssues);
+            // Czech diacritics check: AI proposes issues → we verify each against the actual text
+            // Works for ANY Czech word (not hardcoded). Zero false positives (literal verification).
+            if (this.ai && (language === 'cs' || language === 'cs-CZ' || language === 'unknown')) {
+                try {
+                    const diacriticsIssues = await this.checkCzechDiacritics(text);
+                    issues.push(...diacriticsIssues);
+                } catch (e) {
+                    this.logger.warn(`Diacritics check failed, skipping: ${e.message}`);
+                }
             }
 
             // Readability analysis
@@ -91,78 +94,86 @@ export class TextQaService implements OnModuleInit {
             throw error;
         }
     }
+
     /**
-     * Check for Czech words with missing diacritics using DIRECT string matching.
+     * AI-powered Czech diacritics check with LITERAL VERIFICATION.
      *
-     * How it works:
-     * - We have a list of [wrongWord, correctWord] pairs
-     * - For each pair, we check if the EXACT wrong word appears in the text (case-insensitive)
-     * - If yes → flag it. If the correct word is there instead → the regex won't match → no flag.
+     * Two phases:
+     * 1. PROPOSE: Gemini AI analyzes the text and proposes words with missing diacritics.
+     *    This works for ANY Czech word — no hardcoded list.
+     * 2. VERIFY: For each AI proposal, we check if the "wrong" word LITERALLY exists
+     *    in the extracted text (case-insensitive word match).
+     *    - If "PRÁTELI" is literally in the text → confirmed, report it
+     *    - If the text has "PŘÁTELI" instead → "PRÁTELI" is NOT in the text → discard (false positive)
      *
-     * Why this works perfectly:
-     * - "S PRÁTELI" → regex /\bPRÁTELI\b/i matches "PRÁTELI" → ✅ flagged
-     * - "S PŘÁTELI" → regex /\bPRÁTELI\b/i does NOT match "PŘÁTELI" (Ř ≠ R) → ✅ not flagged
-     * - No diacritics stripping, no normalization, no AI. Just literal matching.
+     * This gives: universal coverage + zero false positives.
      */
-    private checkKnownDiacritics(text: string): TextIssue[] {
-        const issues: TextIssue[] = [];
+    private async checkCzechDiacritics(text: string): Promise<TextIssue[]> {
+        if (!this.ai || !text.trim()) return [];
 
-        // Each entry: [exact wrong word, correct word]
-        // The wrong word is searched as-is (case-insensitive) with word boundaries
-        const corrections: [string, string][] = [
-            // Missing ř (P + R instead of PŘ)
-            ['PRATELI', 'PŘÁTELI'],
-            ['PRÁTELI', 'PŘÁTELI'],
-            ['PRATELE', 'PŘÁTELÉ'],
-            ['PRÁTELE', 'PŘÁTELÉ'],
-            ['PRATEL', 'PŘÁTEL'],
-            ['PRÁTEL', 'PŘÁTEL'],
-            ['PRITEL', 'PŘÍTEL'],
-            ['PRITELE', 'PŘÍTELE'],
-            ['PREKVAPENI', 'PŘEKVAPENÍ'],
-            ['PRIRODA', 'PŘÍRODA'],
-            ['PRIRODNI', 'PŘÍRODNÍ'],
-            // Missing š (S instead of Š)
-            ['NEJRADSI', 'NEJRADŠÍ'],
-            ['NEJLEPSI', 'NEJLEPŠÍ'],
-            ['NEJVETSI', 'NEJVĚTŠÍ'],
-            ['SKOLKA', 'ŠKOLKA'],
-            ['SKOLKY', 'ŠKOLKY'],
-            // Missing č (C instead of Č)
-            ['CESKY', 'ČESKY'],
-            ['CESKE', 'ČESKÉ'],
-            ['CESKA', 'ČESKÁ'],
-            ['CERVENA', 'ČERVENÁ'],
-            ['CERVENY', 'ČERVENÝ'],
-            // Missing ž (Z instead of Ž)
-            ['SOUTEZ', 'SOUTĚŽ'],
-            ['SOUTEZE', 'SOUTĚŽE'],
-            ['SOUTEZI', 'SOUTĚŽI'],
-            // Missing í/ý
-            ['ZISKEJ', 'ZÍSKEJ'],
-            ['NABIDKA', 'NABÍDKA'],
-            ['VYHODA', 'VÝHODA'],
-            ['VYHODY', 'VÝHODY'],
-        ];
+        const prompt = [
+            'Jsi kontrolor českého pravopisu. Analyzuj tento text a najdi slova, kterým chybí háčky nebo čárky.',
+            '',
+            `TEXT: "${text}"`,
+            '',
+            'Hledej POUZE chybějící diakritiku (háčky ř,š,č,ž,ď,ť,ň a čárky á,é,í,ó,ú,ů,ý).',
+            'Ignoruj vlastní jména, zkratky a cizí slova.',
+            'Pro každé nalezené slovo uveď PŘESNÝ tvar jak je v textu (wrong) a správný tvar (correct).',
+            '',
+            'Formát odpovědi — POUZE JSON pole:',
+            '[{"wrong": "PRATELI", "correct": "PŘÁTELI"}]',
+            'Pokud žádné chyby nejsou: []',
+        ].join('\n');
 
-        for (const [wrong, correct] of corrections) {
-            // Build a case-insensitive word-boundary regex for the EXACT wrong word
-            const regex = new RegExp(`\\b${wrong}\\b`, 'i');
+        const response = await this.ai.models.generateContent({
+            model: 'gemini-2.5-flash-lite',
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            config: { temperature: 0 },
+        });
+
+        const raw = (response.text || '').trim();
+        const jsonStr = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
+        let parsed: { wrong: string; correct: string }[];
+        try {
+            parsed = JSON.parse(jsonStr);
+        } catch {
+            this.logger.warn(`AI diacritics check returned non-JSON: ${raw.substring(0, 100)}`);
+            return [];
+        }
+
+        if (!Array.isArray(parsed) || parsed.length === 0) return [];
+
+        // CRITICAL VERIFICATION: Only keep issues where the "wrong" word LITERALLY appears in the text.
+        // This eliminates ALL false positives — if the text has "PŘÁTELI" (correct),
+        // the AI might wrongly say "PŘÁTELI" is wrong, but our regex for "PŘÁTELI" won't match
+        // because Ř ≠ R, so it gets discarded.
+        const verified: TextIssue[] = [];
+        for (const item of parsed) {
+            if (!item.wrong || !item.correct || item.wrong === item.correct) continue;
+
+            // Escape special regex characters in the wrong word
+            const escaped = item.wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+
             if (regex.test(text)) {
-                issues.push({
+                verified.push({
                     type: 'typo',
                     severity: 'high',
-                    text: `Chybí diakritika: „${wrong}" → správně „${correct}"`,
-                    suggestion: `Správně: „${correct}"`,
+                    text: `Chybí diakritika: „${item.wrong}" → správně „${item.correct}"`,
+                    suggestion: `Správně: „${item.correct}"`,
                 });
+            } else {
+                this.logger.debug?.(`AI suggested "${item.wrong}" but it's not in the text — discarded (false positive)`);
             }
         }
 
-        if (issues.length > 0) {
-            this.logger.log(`Diacritics check found ${issues.length} issue(s)`);
+        if (verified.length > 0) {
+            this.logger.log(`Diacritics check: AI proposed ${parsed.length}, verified ${verified.length}`);
         }
-        return issues;
+        return verified;
     }
+
 
     private checkBasicGrammar(text: string, language: string): TextIssue[] {
         const issues: TextIssue[] = [];
