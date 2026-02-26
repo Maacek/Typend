@@ -130,22 +130,31 @@ export class OcrService {
         }
     }
 
+    /**
+     * Strip diacritical marks for locale-agnostic comparison.
+     * e.g. 'PŘÁTELI' → 'PRATELI', 'NEJRADŠÍ' → 'NEJRADSI'
+     */
+    private removeDiacritics(str: string): string {
+        return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
     private calculateBasicSimilarity(text1: string, text2: string): number {
         if (!text1 && !text2) return 100;
         if (!text1 || !text2) return 0;
 
-        const normalize = (str: string) => str.toLowerCase().trim().replace(/\s+/g, ' ');
+        // Normalize AND strip diacritics before comparing.
+        // This ensures 'PŘÁTELI' (Azure) and 'PRÁTELI' (Google) count as the same word —
+        // the providers agree on the WORD, just differ on diacritics (which is an OCR limitation).
+        const normalize = (str: string) =>
+            this.removeDiacritics(str.toLowerCase().trim().replace(/\s+/g, ' '));
+
         const norm1 = normalize(text1);
         const norm2 = normalize(text2);
 
-        // Simple length-based similarity approximation to replace fastest-levenshtein
         const maxLength = Math.max(norm1.length, norm2.length);
-        const minLength = Math.min(norm1.length, norm2.length);
-
         if (maxLength === 0) return 100;
 
         let matchCount = 0;
-        // Naive bag-of-words similarity for basic functionality without extra packages
         const words1 = norm1.split(' ');
         const words2 = norm2.split(' ');
 
@@ -162,14 +171,17 @@ export class OcrService {
         azureResult: OcrResult,
         similarity: number,
     ): ConsensusResult {
-        // High consensus (≥95%): merge both results
+        // High consensus (≥95%): providers agree on content — prefer Azure text (better diacritics)
         if (similarity >= this.CONSENSUS_THRESHOLD) {
             const avgConfidence = (googleResult.confidence + azureResult.confidence) / 2 + 10; // Bonus for consensus
+            // Prefer Azure text: Azure Vision reliably preserves Czech diacritics (háčky/čárky).
+            // Google Vision often drops ř→r, š→s etc., so at consensus we use Azure's version.
+            const preferredText = azureResult.text.length > 0 ? azureResult.text : googleResult.text;
 
             return {
-                text: googleResult.text.length >= azureResult.text.length ? googleResult.text : azureResult.text,
+                text: preferredText,
                 confidence: Math.min(100, avgConfidence),
-                language: googleResult.language || azureResult.language,
+                language: azureResult.language || googleResult.language,
                 provider: 'dual-consensus',
                 blocks: [...(googleResult.blocks || []), ...(azureResult.blocks || [])],
                 processingTime: Math.max(googleResult.processingTime, azureResult.processingTime),
