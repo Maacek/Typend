@@ -219,11 +219,15 @@ export default function Home() {
                   onClick={async () => {
                     try {
                       const token = localStorage.getItem('token');
-                      const response = await fetch(`http://localhost:4010/api/v1/batches/${batchResults.batchId}/export/csv`, {
+                      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4010/api/v1';
+                      const response = await fetch(`${apiUrl}/batches/${batchResults.batchId}/export/csv`, {
                         headers: {
                           'Authorization': `Bearer ${token}`,
                         },
                       });
+                      if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                      }
                       const blob = await response.blob();
                       const url = window.URL.createObjectURL(blob);
                       const a = document.createElement('a');

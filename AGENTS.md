@@ -57,13 +57,18 @@ Aby se předešlo zmatkům v deploymentu, zde je tabulka všech API a jejich kl�
 | Feature / Fáze | Služba | Konfigurační klíč | Kde je definován | Role |
 |---------------|--------|------------------|-----------------|------|
 | **OCR Backend** | Azure Vision API | `AZURE_VISION_KEY` / `AZURE_VISION_ENDPOINT` | `backend/.env` | Extrahuje text z kreativ (Phase 2A) |
-| **OCR Backend** | Google Cloud Vision | `GOOGLE_APPLICATION_CREDENTIALS` | `backend/.env` | Alternativní OCR pro porovnání (Phase 2A) |
-| **Příprava Textu** | Google Gemini | `GOOGLE_AI_API_KEY` | `backend/.env` | Model `gemini-1.5-flash`: Filtruje banner text od produktu |
+| **OCR Backend** | Google Cloud Vision | `GOOGLE_APPLICATION_CREDENTIALS` | `backend/.env` | Cesta k JSON souboru s credentials (lokální vývoj) |
+| **OCR Backend** | Google Cloud Vision | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | Railway Variables | Inline JSON string s credentials (produkce Railway) |
+| **Příprava Textu** | Google Gemini | `GOOGLE_AI_API_KEY` | `backend/.env` | Model `gemini-2.5-flash-lite`: Filtruje banner text od produktu |
+| **Text QA** | Google Gemini | `GOOGLE_AI_API_KEY` | `backend/.env` | Model `gemini-2.5-flash-lite`: Kontrola českých háčků/čárek (temp=0) |
 | **Vizuální Analýza**| Google Gemini | `GOOGLE_AI_API_KEY` | `backend/.env` | Model `gemini-2.5-flash`: Dává skóre a doporučení (Phase 3) |
 | **Frontend API** | Lokální Backend | `NEXT_PUBLIC_API_URL` | `frontend/.env.local` | Zásadní: Musí vždy ukazovat na běžící API (lokálně `4010`) |
 
 > **Důležité pravidlo Deploymentu:**  
 > Pokud vyprší `GOOGLE_AI_API_KEY`, backend worker selže u vizuální analýzy a filtrace textu. Lokální běh používá `backend/.env`, zatímco produkce (Railway) používá proměnné nastavené v administraci Railway. Generování nového lokálního klíče nijak neovlivňuje produkční klíče, ale je nutné ho vždy uvést ve správném `.env` souboru.
+> 
+> **Google Vision na Railway:**  
+> Na Railway nelze použít `GOOGLE_APPLICATION_CREDENTIALS` (cestu k souboru). Místo toho se použije `GOOGLE_APPLICATION_CREDENTIALS_JSON` — celý obsah JSON souboru uložený jako env var string. `GoogleVisionProvider` ho automaticky parsuje a předá klientovi.
 
 ### Communication Flow
 
