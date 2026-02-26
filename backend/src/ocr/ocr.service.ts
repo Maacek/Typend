@@ -273,6 +273,11 @@ PŘÍKLADY:
 FORMÁT ODPOVĚDI:
 Vrať POUZE text overlay (ne text z produktů), jeden řádek per text.
 
+⚠️ KRITICKÉ PRAVIDLO:
+ZACHOVEJ text PŘESNĚ jak ho OCR přečetlo. NEOPRAVUJ háčky, čárky ani pravopis.
+Pokud OCR přečetlo "PRÁTELI" místo "PŘÁTELI", napiš "PRÁTELI" — neopravuj to!
+Tvůj úkol je POUZE filtrovat, ne opravovat.
+
 BEZ komentářů, vysvětlení, odrážek.
 
 Pokud není žádný overlay text → vrať prázdný řetězec.`.trim();

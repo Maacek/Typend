@@ -66,18 +66,15 @@ export class AnalysisProcessor extends WorkerHost {
             }
 
             // Phase 2B: Text Quality Analysis
-            // IMPORTANT: Run on RAW OCR text (ocrResult.text), NOT on filteredText.
-            // Gemini's text filtering auto-corrects diacritics (e.g. PRÁTELI → PŘÁTELI),
-            // which makes it impossible to detect OCR diacritics errors in the filtered text.
-            // The user sees the raw OCR text in the UI, so spell-check must match what they see.
+            // Run on filteredText — now that the Gemini filter preserves OCR diacritics errors,
+            // the spell-check will see the same text as the user and can flag missing háčky/čárky.
             let qaResult = null;
-            const textForQa = ocrResult.text;
-            if (textForQa && textForQa.trim().length > 0) {
-                this.logger.log(`Running text QA analysis on raw OCR text...`);
+            if (filteredText && filteredText.trim().length > 0) {
+                this.logger.log(`Running text QA analysis on filtered text...`);
                 await this.prisma.creative.update({ where: { id: creativeId }, data: { status: 'RUNNING_TEXT_QA' as any } });
-                qaResult = await this.textQa.analyzeText(textForQa, ocrResult.language || 'unknown');
+                qaResult = await this.textQa.analyzeText(filteredText, ocrResult.language || 'unknown');
             } else {
-                this.logger.warn(`No OCR text found, skipping Text QA`);
+                this.logger.warn(`No banner text found after filtering, skipping Text QA`);
             }
 
             // Phase 3: Visual Analysis
@@ -96,7 +93,7 @@ export class AnalysisProcessor extends WorkerHost {
                 where: { creativeId: creative.id },
                 create: {
                     creativeId: creative.id,
-                    extractedText: ocrResult.text, // Use raw OCR text (shows diacritics errors to user)
+                    extractedText: filteredText, // Use filtered banner text (preserves OCR diacritics)
                     textConfidence: ocrResult.confidence,
                     textIssues: (qaResult ? qaResult.issues : []) as any,
                     // Dual-API metadata (Phase 2C)
@@ -114,7 +111,7 @@ export class AnalysisProcessor extends WorkerHost {
                     heatmapUrl: visualResult.heatmapUrl || null,
                 },
                 update: {
-                    extractedText: ocrResult.text, // Use raw OCR text (shows diacritics errors to user)
+                    extractedText: filteredText, // Use filtered banner text (preserves OCR diacritics)
                     textConfidence: ocrResult.confidence,
                     textIssues: (qaResult ? qaResult.issues : []) as any,
                     // Dual-API metadata (Phase 2C)
